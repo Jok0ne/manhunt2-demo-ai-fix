@@ -1,6 +1,6 @@
 # Manhunt 2 Demo AI Fix
 
-Manhunt 2 (Rockstar Games, 2007) shipped on **all platforms** with placeholder AI values that were never reverted from a demo build. This repository documents the discovery and provides a fix.
+Both Manhunt 1 (2003) and Manhunt 2 (2007) shipped with placeholder AI values intended for demo builds. The community has long known about Manhunt 1's demo AI settings. This repository documents that **Manhunt 2 uses the exact same file** — byte-for-byte identical — and provides a cross-platform fix.
 
 ## Key Facts
 
@@ -8,14 +8,19 @@ Manhunt 2 (Rockstar Games, 2007) shipped on **all platforms** with placeholder A
 - Hunters **chase for 3 seconds** before giving up (`SUSTAIN_ACTION chase 3`)
 - Hunters search with **reduced thoroughness** (35m radius, 85% density)
 - The developers marked these values with `#SETTINGS FOR DEMO VERSION!!!!!`
-- The file `AITYPED.INI` is **byte-for-byte identical** across PSP, PS2, and PC
-- **SHA256** (all platforms): `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83`
+- The file `AITYPED.INI` is **byte-for-byte identical** across Manhunt 1 PC, Manhunt 2 PSP, PS2, and PC
+- **SHA256** (all versions): `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83`
 
-## Why This Exists
+## Background
 
-Manhunt 2 received an AO (Adults Only) rating from the ESRB in June 2007. Sony and Nintendo refused to license AO titles, forcing Rockstar to spend months censoring content (VHS blur effects, cut executions) to secure an M rating. Both console ISOs were mastered on September 5, 2007. During this crunch, the AI config — which controls how aggressively enemies fight — was left at demo values.
+The Manhunt 1 community has known for years that the game shipped with demo AI values (`#SETTINGS FOR DEMO VERSION!!!!!`). What was not documented until now:
 
-This explains 18 years of community complaints that Manhunt 2's hunters feel "braindead" compared to the original. The existing [Manhunt 2 Improved AI](https://www.moddb.com/mods/manhunt-2-improved-ai) mod on ModDB adjusts vision and hearing ranges but **does not address the SUSTAIN_ACTION values** — the core issue documented here. On PC, the config files are stored compressed inside proprietary `.glg` containers, which may explain why they were never found.
+1. **Manhunt 2 uses the exact same file** — `AITYPED.INI` is byte-for-byte identical (SHA256 match) between Manhunt 1 (2003) and Manhunt 2 (2007). Rockstar copied the config unchanged across 4 years.
+2. **Cross-platform verification** — the file is identical across PSP, PS2, and PC versions of Manhunt 2.
+3. **No existing fix addresses the core issue** — the [Manhunt 2 Improved AI](https://www.moddb.com/mods/manhunt-2-improved-ai) mod on ModDB adjusts vision and hearing ranges but does not touch the `SUSTAIN_ACTION` values.
+4. **PC configs are hidden** — on PC, the config is zlib-compressed inside proprietary `.glg` containers, making it harder to find than on console.
+
+Manhunt 2 received an AO (Adults Only) rating from the ESRB in June 2007. Sony and Nintendo refused to license AO titles, forcing Rockstar to spend months censoring content (VHS blur effects, cut executions) to secure an M rating. Both console ISOs were mastered on September 5, 2007. During this crunch, the inherited demo AI config was never updated.
 
 ## The Fix
 
@@ -63,17 +68,25 @@ with open('AITYPED.INI','wb') as f: f.write(zlib.decompress(d[8:]))
 grep -n "DEMO VERSION" AITYPED.INI
 ```
 
+## Manhunt 1 Connection
+
+The demo AI values originate from Manhunt 1 (2003). Rockstar's `aiTypeData.ini` (MH1) and `AITYPED.INI` (MH2) are **byte-for-byte identical** — same 13,627 bytes, same SHA256 hash. This means the demo values were never a Manhunt 2-specific oversight; they were inherited wholesale from MH1's codebase and left unchanged through the MH2 development cycle.
+
+Manhunt 1's config was extracted from `ManHunt.pak` (MHPK format, XOR 0x7F encrypted). See [evidence/VERIFICATION.md](evidence/VERIFICATION.md) for full details.
+
 ## Evidence
 
 See [`evidence/`](evidence/) for:
 - [Full discovery report](evidence/DISCOVERY.md) — detailed analysis with code excerpts
-- [Cross-platform verification](evidence/VERIFICATION.md) — SHA256 hashes, ISO metadata, reproduction steps
+- [Cross-platform verification](evidence/VERIFICATION.md) — SHA256 hashes across MH1 and MH2, ISO metadata, reproduction steps
 
 ## Credits
 
-**Discovery & Fix**: Jok0ne aka Zerone (February 2026)
+**Fix & Cross-Platform Analysis**: Jok0ne aka Zerone (February 2026)
 
-**Method**: Systematic analysis of 287 config files using SQLite FTS5 full-text search and ChromaDB semantic search.
+**Method**: Systematic analysis of 287+ config files using SQLite FTS5 full-text search and ChromaDB semantic search. Manhunt 1 config extracted via MHPK PAK reverse-engineering (XOR 0x7F decryption). Fix values informed by GTA III/VC/SA source code reference analysis.
+
+**Prior work**: The Manhunt 1 community previously identified the demo AI values. This project adds cross-platform SHA256 verification, the MH1↔MH2 identity proof, and a concrete fix.
 
 ## License
 

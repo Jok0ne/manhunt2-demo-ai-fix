@@ -1,14 +1,21 @@
-# Evidence: Manhunt 2 Shipped With Demo AI Values
+# Evidence: Manhunt 1 & 2 Shipped With Demo AI Values
 
-## Cross-Platform Verification Report
+## Cross-Platform and Cross-Game Verification Report
 
-**Date**: 2026-02-07
+**Date**: 2026-02-07 (MH2), updated 2026-02-21 (MH1 verification)
 **Analyst**: Jok0ne aka Zerone
-**Method**: Direct extraction from retail ISOs + NSIS installer decompression
+**Method**: Direct extraction from retail ISOs, NSIS installer decompression, and MHPK PAK reverse-engineering
 
 ---
 
-## 1. Source ISOs
+## 1. Source Files
+
+### Manhunt 1 PC (Razor1911 scene release)
+- **Source**: `archive.org/details/manhunt-razor-1911_202602`
+- **Archive**: `ManHunt.pak` (MHPK format, 82 files, XOR 0x7F encrypted)
+- **Config Path**: `levels/global/data/aiTypeData.ini` (inside PAK)
+- **Config Format**: XOR 0x7F encrypted plain text INI
+- **Extraction**: MHPK header parsing (276-byte entries) + XOR 0x7F decryption on all data bytes
 
 ### PSP (Europe) — ULES-00756
 - **File**: `Manhunt 2 (Europe) (En,Fr,De,Es,It).iso`
@@ -46,15 +53,18 @@
 
 ---
 
-## 2. AITYPED.INI Hash Comparison
+## 2. AI Config Hash Comparison
 
-| Platform | Extraction Method | SHA256 | Size |
-|----------|------------------|--------|------|
-| PSP (EU) | 7z extract from UMD ISO | `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83` | 13,627 bytes |
-| PS2 (EU) | 7z extract from UDF ISO | `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83` | 13,627 bytes |
-| PC (EN)  | zlib decompress from .glg | `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83` | 13,627 bytes |
+| Game | Platform | Extraction Method | SHA256 | Size |
+|------|----------|------------------|--------|------|
+| **MH1** | PC | XOR 0x7F decrypt from MHPK `.pak` | `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83` | 13,627 bytes |
+| **MH2** | PSP (EU) | 7z extract from UMD ISO | `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83` | 13,627 bytes |
+| **MH2** | PS2 (EU) | 7z extract from UDF ISO | `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83` | 13,627 bytes |
+| **MH2** | PC (EN) | zlib decompress from .glg | `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83` | 13,627 bytes |
 
-**Result: Byte-for-byte identical across all three platforms.**
+**Result: Byte-for-byte identical across Manhunt 1 (2003) and all three Manhunt 2 (2007) platforms.**
+
+Rockstar copied `aiTypeData.ini` from Manhunt 1 into Manhunt 2 without modifying a single byte. The file was then distributed unchanged across PSP, PS2, and PC.
 
 ---
 
@@ -144,7 +154,57 @@ This means PC modders cannot simply edit a text file — they need to decompress
 
 ---
 
-## 6. Reproduction Steps
+## 6. Manhunt 1 PAK Format (MHPK)
+
+Manhunt 1 PC stores configs inside `ManHunt.pak` with XOR encryption:
+
+```
+Header (12 bytes):
+  4 bytes: "MHPK" magic
+  4 bytes: Version (0x00020000 = v2.0, little-endian)
+  4 bytes: Entry count (82 files)
+
+Entry (276 bytes each):
+  256 bytes: Filename (null-padded ASCII)
+  4 bytes:   Padding
+  4 bytes:   File size
+  4 bytes:   Absolute offset into PAK
+  4 bytes:   Flags
+  4 bytes:   Hash
+
+Data encryption: Every byte XOR'd with 0x7F
+  '#' (0x23) stored as '\' (0x5C)
+  '\n' (0x0A) stored as 'u' (0x75)
+  '\r' (0x0D) stored as 'r' (0x72)
+  '\t' (0x09) stored as 'v' (0x76)
+  ' ' (0x20) stored as '_' (0x5F)
+```
+
+---
+
+## 7. Reproduction Steps
+
+### Manhunt 1 PC
+```bash
+# Extract ManHunt.pak from installer/disc, then:
+python3 -c "
+import struct
+with open('ManHunt.pak','rb') as f: data=f.read()
+n=struct.unpack_from('<I',data,8)[0]
+for i in range(n):
+    b=12+(i*276)
+    name=data[b:b+256].split(b'\x00')[0].decode()
+    sz=struct.unpack_from('<I',data,b+260)[0]
+    off=struct.unpack_from('<I',data,b+264)[0]
+    if 'aiTypeData' in name:
+        dec=bytes(x^0x7F for x in data[off:off+sz])
+        open('aiTypeData_MH1.ini','wb').write(dec)
+        print(f'Extracted: {name} ({sz} bytes)')
+"
+grep -n 'DEMO VERSION' aiTypeData_MH1.ini
+shasum -a 256 aiTypeData_MH1.ini
+# Expected: aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83
+```
 
 ### PSP / PS2 (easiest)
 ```bash
@@ -155,7 +215,7 @@ grep -n "DEMO VERSION" /tmp/AITYPED.INI
 # Verify: lines ~152 and ~192
 ```
 
-### PC
+### MH2 PC
 ```bash
 # 1. Extract setup.exe from ISO
 7z e rld-mh2.iso setup.exe
@@ -175,7 +235,7 @@ grep -n "DEMO VERSION" AITYPED_PC.INI
 
 ---
 
-## 7. Timeline Context
+## 8. Timeline Context
 
 Both ISOs were mastered on the same day:
 - PS2: **2007-09-05 08:06:02** (morning)
@@ -187,7 +247,7 @@ The ESRB AO-to-M rating crisis occurred June-September 2007, with the final subm
 
 ---
 
-## Appendix: File Identification Table
+## Appendix A: File Identification Table
 
 | File | Description | Size (bytes) | Content |
 |------|-------------|------|---------|
@@ -196,4 +256,14 @@ The ESRB AO-to-M rating crisis occurred June-September 2007, with the final subm
 
 ---
 
-*Compiled 2026-02-07. All hashes computed with SHA-256 via `shasum -a 256`.*
+## Appendix B: Manhunt 1 PAK Contents (82 files)
+
+The MHPK archive contains 9 global config files and 24 levels × 3 files each:
+
+**Global configs**: `aiTypeData.ini`, `WeaponTypeData.ini`, `physicsTypeData.ini`, `ShotTypeData.ini`, `AISounds.ini`, `Communications.ini`, `EntityStateSounds.ini`, `ParticleEffects.INI`, `WEATHER.INI`
+
+**Per-level (24 levels)**: `entityTypeData.ini` + `levelSetup.ini` + `splines.ini` each
+
+---
+
+*Compiled 2026-02-07 (MH2), updated 2026-02-21 (MH1 verification). All hashes computed with SHA-256 via `shasum -a 256`.*

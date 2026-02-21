@@ -2,14 +2,12 @@
 
 ## Summary
 
-Manhunt 2 (Rockstar Games, 2007) was released on **all platforms** (PS2, PSP, Wii, PC) with placeholder AI values intended for a demo build. The developers marked these values explicitly with the comment `SETTINGS FOR DEMO VERSION!!!!!` but never reverted them to final gameplay values before shipping.
+Both Manhunt 1 (2003) and Manhunt 2 (2007) shipped with placeholder AI values intended for demo builds. The Manhunt 1 community has known about these demo values for years. What this project documents is that **Manhunt 2 uses the exact same config file** — byte-for-byte identical — inherited unchanged from MH1, and provides a cross-platform fix.
 
-This results in hunters that:
+The demo values result in hunters that:
 - **Fight for only 1 second** before disengaging (`SUSTAIN_ACTION combat 1`)
 - **Chase the player for only 3 seconds** before giving up (`SUSTAIN_ACTION chase 3`)
 - **Search a limited area** with reduced thoroughness
-
-To our knowledge, this has never been publicly documented by the modding community despite the game being released 18+ years ago.
 
 ---
 
@@ -70,36 +68,43 @@ RECORD search_parameters
 
 These values result in less thorough searching, making it easier for demo players to avoid detection.
 
-### Cross-Platform Verification
+### Cross-Platform and Cross-Game Verification
 
-The file `AITYPED.INI` is **byte-for-byte identical** across all verified platforms:
+The AI config file is **byte-for-byte identical** across Manhunt 1 and all verified Manhunt 2 platforms:
 
-| Platform | Version | AITYPED.INI SHA256 | Config Format |
-|----------|---------|-------------------|---------------|
-| PSP | ULES-00756 (EU) | `aee092ad6f9de...3ed2b83` | Plain text INI |
-| PS2 | PAL (EU) | `aee092ad6f9de...3ed2b83` | Plain text INI |
-| PC | EN (RELOADED) | `aee092ad6f9de...3ed2b83` | zlib-compressed in `.glg` container |
+| Game | Platform | Version | SHA256 | Config Format |
+|------|----------|---------|--------|---------------|
+| **Manhunt 1** | PC | Razor1911 / PCDVD | `aee092ad...3ed2b83` | XOR 0x7F encrypted in MHPK `.pak` |
+| **Manhunt 2** | PSP | ULES-00756 (EU) | `aee092ad...3ed2b83` | Plain text INI |
+| **Manhunt 2** | PS2 | PAL (EU) | `aee092ad...3ed2b83` | Plain text INI |
+| **Manhunt 2** | PC | EN (RELOADED) | `aee092ad...3ed2b83` | zlib-compressed in `.glg` container |
 
-Full SHA256: `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83`
+Full SHA256: `aee092ad6f9de0071472d6e110ad277048ce498ed6fe5576eef4d2b0b3ed2b83` (13,627 bytes)
 
-Both console ISOs were mastered on the same day: **PS2 at 08:06, PSP at 17:04 on September 5, 2007.**
+**This means Rockstar copied `aiTypeData.ini` from Manhunt 1 (2003) to Manhunt 2 (2007) without any modification whatsoever** — not even a single byte was changed across 4 years of development.
+
+Both MH2 console ISOs were mastered on the same day: **PS2 at 08:06, PSP at 17:04 on September 5, 2007.**
 
 The Wii version is expected to be identical but was not verified in this analysis.
 
 ---
 
-## Why Was This Never Fixed?
+## Origin: Inherited from Manhunt 1
 
-### The ESRB Crisis Timeline (2007)
+The demo AI values are **not** a Manhunt 2-specific mistake. They originate from Manhunt 1 (2003), where they have been known to the community for some time. Rockstar copied the entire `aiTypeData.ini` (renamed `AITYPED.INI`) unchanged into Manhunt 2's codebase.
+
+The Manhunt 1 config was extracted from `ManHunt.pak`, which uses Rockstar's MHPK archive format with XOR 0x7F encryption on all file data. After decryption, the file is byte-for-byte identical to every Manhunt 2 version.
+
+### Why Manhunt 2 Never Got Fixed Values
+
+#### The ESRB Crisis Timeline (2007)
 
 1. **June 2007** — Manhunt 2 receives AO (Adults Only) rating from ESRB
 2. **June 2007** — Sony and Nintendo refuse to license AO games; release cancelled
 3. **July-September 2007** — Rockstar scrambles to censor content (VHS blur effects, cut executions)
 4. **October 2007** — Resubmitted, receives M rating, rushed to release
 
-During this period, the development team was focused on censoring violent content to satisfy the ESRB. The AI configuration — which determines how aggressively enemies fight — was likely deprioritized or overlooked in the rush to ship.
-
-It's also possible that the reduced AI aggression was intentionally kept to make the censored version feel less intense, though the explicit "DEMO VERSION" comments suggest these were meant to be temporary.
+The inherited demo config was never updated during this crunch. The development team was focused on censoring violent content to satisfy the ESRB. The AI configuration was likely deprioritized or simply assumed to be correct since it was carried over from the previous game.
 
 ---
 
@@ -123,7 +128,7 @@ Multiple reviews and player discussions from 2007-2025 note that Manhunt 2's AI 
 
 > "The hunters in MH2 are braindead compared to MH1" — common sentiment on r/manhunt and GTA Forums
 
-The [Manhunt 2 Improved AI mod](https://www.moddb.com/mods/manhunt-2-improved-ai) on ModDB tweaks vision and hearing ranges but **does not address the SUSTAIN_ACTION values** — the mod author appears unaware of the demo values.
+The [Manhunt 2 Improved AI mod](https://www.moddb.com/mods/manhunt-2-improved-ai) on ModDB tweaks vision and hearing ranges but **does not address the SUSTAIN_ACTION values**.
 
 ---
 
@@ -177,12 +182,13 @@ The file is plain text (or trivially decompressible), unencrypted, and has been 
 
 ---
 
-## Discovery Details
+## Discovery & Analysis Details
 
-- **Discovered by:** Jok0ne aka Zerone, February 2026
-- **Method:** Systematic analysis of all 287 config files using a custom SQLite FTS5 index (146,586 entries) + ChromaDB semantic search (11,019 vectors)
-- **Platforms verified:** PSP (ULES-00756), PS2 (PAL), PC (EN) — all byte-identical
-- **Prior documentation:** None found (searched ModDB, Dixmor Hospital wiki, PCGamingWiki, GTA Forums, Reddit r/manhunt, ermaccer's tools, Manhunt Fandom Wiki — February 2026)
+- **Analysis by:** Jok0ne aka Zerone, February 2026
+- **Method:** Systematic analysis of 287+ config files using a custom SQLite FTS5 index (146,586 entries) + ChromaDB semantic search (11,019 vectors). Manhunt 1 PAK extraction via MHPK reverse-engineering (XOR 0x7F decryption). Fix values informed by GTA III/VC/SA reversed source code analysis.
+- **MH2 platforms verified:** PSP (ULES-00756), PS2 (PAL), PC (EN) — all byte-identical
+- **MH1 verification:** PC (Razor1911 scene release) — byte-identical to all MH2 versions
+- **Prior knowledge:** The Manhunt 1 community has known about the demo AI values. This project adds: (1) SHA256 proof that MH1 and MH2 share the exact same file, (2) cross-platform MH2 verification, (3) a concrete fix with values informed by GTA source code analysis.
 - **Evidence file:** See [VERIFICATION.md](VERIFICATION.md) for full SHA256 hashes, ISO metadata, and reproduction steps
 
 ---
