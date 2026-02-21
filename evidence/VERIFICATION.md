@@ -120,9 +120,7 @@ RECORD default
 #################################
 ```
 
-- `SUSTAIN_ACTION combat 1` — Hunters fight for **1 second** before disengaging
-- `SUSTAIN_ACTION chase 3` — Hunters chase for **3 seconds** before giving up
-- `investigate 8` appears to be a normal value
+> **Note (2026-02-21):** Binary analysis confirmed that `SUSTAIN_ACTION`, `SET_ALERT_LEVEL`, and `ALERT_LEVEL_DEGRADE` are **not parsed** by either the MH1 or MH2 engine. These strings do not exist in either executable. The values above are dead data from an unfinished data-driven AI system. Combat and chase durations are hardcoded in the game executables.
 
 ### Block 2: Search Parameters (Lines 191-196)
 

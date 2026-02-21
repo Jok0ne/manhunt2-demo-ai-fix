@@ -5,9 +5,10 @@
 Both Manhunt 1 (2003) and Manhunt 2 (2007) shipped with placeholder AI values intended for demo builds. The Manhunt 1 community has known about these demo values for years. What this project documents is that **Manhunt 2 uses the exact same config file** — byte-for-byte identical — inherited unchanged from MH1, and provides a cross-platform fix.
 
 The demo values result in hunters that:
-- **Fight for only 1 second** before disengaging (`SUSTAIN_ACTION combat 1`)
-- **Chase the player for only 3 seconds** before giving up (`SUSTAIN_ACTION chase 3`)
-- **Search a limited area** with reduced thoroughness
+- **Search a limited area** with reduced thoroughness (35m radius, 85% density, 15% double-check)
+- **Hear running as quieter than walking** — acoustic inversion bug in `VOLUME_DISTANCES`
+
+The config also contains `SUSTAIN_ACTION combat 1` and `SUSTAIN_ACTION chase 3`, but binary analysis of both executables confirmed these fields are **never parsed by the engine** — they are dead data from an unfinished system. See the "Engine Analysis" section below.
 
 ---
 
@@ -48,11 +49,11 @@ RECORD default
 #################################
 ```
 
-**What this means:**
-- `SUSTAIN_ACTION combat 1` — A hunter will engage in combat for **1 second**, then disengage. In a game about stealth and brutal combat, enemies give up fighting after one second.
-- `SUSTAIN_ACTION chase 3` — A hunter chasing the player gives up after **3 seconds**. You can simply run around a corner and the AI forgets you existed.
+**What the developers intended:**
+- `SUSTAIN_ACTION combat 1` — combat duration of 1 second
+- `SUSTAIN_ACTION chase 3` — chase duration of 3 seconds
 
-For reference, `investigate` is 8 seconds — this seems like a reasonable final value, suggesting only `combat` and `chase` were reduced for the demo.
+**What actually happens:** Binary analysis confirmed that the engine **does not read** `SUSTAIN_ACTION`, `SET_ALERT_LEVEL`, `ALERT_LEVEL_DEGRADE`, or `ACTION_TRANSITION`. These strings do not exist in either the Manhunt 1 or Manhunt 2 executable. The Manhunt 1 EXE contains debug messages like `TEMP_SetDefaultTransitions() is a temporary function to hardcode transition information` — Rockstar planned a data-driven AI system but never finished it. Combat and chase durations are hardcoded in the game executable.
 
 ### Demo Values — Block 2: Search Parameters (Line 191-210)
 
@@ -128,26 +129,52 @@ Multiple reviews and player discussions from 2007-2025 note that Manhunt 2's AI 
 
 > "The hunters in MH2 are braindead compared to MH1" — common sentiment on r/manhunt and GTA Forums
 
-The [Manhunt 2 Improved AI mod](https://www.moddb.com/mods/manhunt-2-improved-ai) on ModDB tweaks vision and hearing ranges but **does not address the SUSTAIN_ACTION values**.
+The [Manhunt 2 Improved AI mod](https://www.moddb.com/mods/manhunt-2-improved-ai) on ModDB adjusts vision and hearing ranges — fields the engine does read. That mod's approach was on the right track for INI-level changes, though it did not address the search parameters or acoustic inversion bug.
+
+---
+
+## Engine Analysis
+
+Binary analysis of both Manhunt 1 (`MANHUNT.EXE`, 6.3 MB) and Manhunt 2 (`Manhunt2.exe`, 3.1 MB) PC executables confirmed which `AITYPED.INI` sections the engine actually reads:
+
+### Fields the engine reads (INI-fixable)
+
+| Section | What it controls |
+|---------|-----------------|
+| `VOLUME_DISTANCES` | Hearing distances per sound level (float values) |
+| `BSP_VOLUME_FILTERING` | Sound dampening through walls |
+| `INTERESTING_SOUNDS` | Which sounds trigger AI interest |
+| `search_parameters` | `RADIUS_m`, `DENSITY_%`, `DOUBLE_SEARCH_%` |
+
+### Fields the engine ignores (dead data)
+
+| Field | Evidence |
+|-------|----------|
+| `SUSTAIN_ACTION` | String not present in either executable |
+| `ALERT_LEVEL_DEGRADE` | String not present in either executable |
+| `SET_ALERT_LEVEL` | String not present in either executable |
+| `ACTION_TRANSITION` | String not present in either executable |
+
+Manhunt 1's executable contains debug messages confirming the developers intended to replace hardcoded AI transitions with config-driven logic: `TEMP_SetDefaultTransitions() is a temporary function to hardcode transition information`. This replacement was never completed in either game.
 
 ---
 
 ## Recommended Fix
 
-Reasonable non-demo values based on gameplay balance and the structure of the AI system:
+Based on engine analysis, only changes to fields the engine actually reads have an effect:
 
 ```ini
-RECORD default
-    ALERT_LEVEL_DEGRADE     25          # was 20 — slightly longer memory
-    SUSTAIN_ACTION          combat      3       # was 1 (DEMO) — 3x longer fights
-    SUSTAIN_ACTION          chase       5       # was 3 (DEMO) — meaningful pursuits
-    SUSTAIN_ACTION          investigate 8       # unchanged — already reasonable
-
 RECORD search_parameters
-    RADIUS_m            40          # was 35 — slightly wider search
-    DENSITY_%           90          # was 85 — more thorough
-    DOUBLE_SEARCH_%     25          # was 15 — more double-checks
+    RADIUS_m            40          # was 35 — wider search area
+    DENSITY_%           90          # was 85 — more thorough searching
+    DOUBLE_SEARCH_%     25          # was 15 — more re-checking
+
+RECORD VOLUME_DISTANCES
+    # Fix acoustic inversion: Running must be louder than Walking
+    # Original has Running (0.37) quieter than Walking (0.40)
 ```
+
+Fixing combat duration, chase persistence, and alert degradation would require **patching the game executable** where these values are hardcoded.
 
 These values must be changed in the global config **and** all 16 per-level copies (PSP) or the equivalent per-level files on other platforms.
 
@@ -188,7 +215,7 @@ The file is plain text (or trivially decompressible), unencrypted, and has been 
 - **Method:** Systematic analysis of 287+ config files using a custom SQLite FTS5 index (146,586 entries) + ChromaDB semantic search (11,019 vectors). Manhunt 1 PAK extraction via MHPK reverse-engineering (XOR 0x7F decryption). Fix values informed by GTA III/VC/SA reversed source code analysis.
 - **MH2 platforms verified:** PSP (ULES-00756), PS2 (PAL), PC (EN) — all byte-identical
 - **MH1 verification:** PC (Razor1911 scene release) — byte-identical to all MH2 versions
-- **Prior knowledge:** The Manhunt 1 community has known about the demo AI values. This project adds: (1) SHA256 proof that MH1 and MH2 share the exact same file, (2) cross-platform MH2 verification, (3) a concrete fix with values informed by GTA source code analysis.
+- **Prior knowledge:** The Manhunt 1 community has known about the demo AI values. This project adds: (1) SHA256 proof that MH1 and MH2 share the exact same file, (2) cross-platform MH2 verification, (3) binary analysis proving which fields work, (4) a targeted fix for the fields the engine actually reads.
 - **Evidence file:** See [VERIFICATION.md](VERIFICATION.md) for full SHA256 hashes, ISO metadata, and reproduction steps
 
 ---
